@@ -24,6 +24,10 @@ of perception of support on breast feeding intensity.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(
+    # This should allow Rmarkdown to locate the data
+    root.dir = rprojroot::find_rstudio_root_file()
+)
 
 library(haven)
 library(data.table)
@@ -41,10 +45,10 @@ library(car)
 ```{r data_prep, results = 'hide', echo = TRUE}
 
 
-data.directory <- "C:/Users/James/Documents/R/Katies_Thesis/0_Data/"
-
+data.directory <- file.path(rprojroot::find_rstudio_root_file(), "0_Data")
+project.directory <- rprojroot::find_rstudio_root_file()
 ifps_dt <- "ifps2.sas7bdat" %>%
-           paste0(data.directory, .) %>%
+           file.path(data.directory, .) %>%
            read_sas() %>%
            as.data.table()
 
@@ -397,6 +401,9 @@ modeling_dt[, `:=` (perception_of_support = relevel(perception_of_support,
                     breast_feeding_attitude = relevel(breast_feeding_attitude, 
                                                       ref = "Negative"))]
 
+base_levels <- lapply(modeling_dt, function(x){
+  data.table(reference_level = levels(x)[1])
+}) %>% rbindlist(., idcol = 'variable')
 # ------------------------------------------------------------------------------
 
 # List of datasets for 1-6 months to sequence along for modeling
@@ -452,13 +459,52 @@ for(i in seq_along(modeling_data_list)){
   
   # Fits the full regression model using perception of support + optimized control
   # variables
-full_formula <- as.formula(paste("breast_feeding_intensity ~ ", 
+  full_formula <- as.formula(paste("breast_feeding_intensity ~ ", 
                          paste(c(response_var, optimal_control_variable_subset), 
                                collapse = "+")))
   
   temp_fullModel <- multinom(full_formula, 
             data = temp_dt)
+  
+  # Create a table of variable coefficients and their associated odds ratios at 
+  # different levels of the variable
+  
+   coef_dt <- coef(temp_fullModel) %>% as.data.table()
 
+   coef_dt[, response_level := attributes(coef(temp_fullModel))$dimnames[[1]]]
+  
+   coef_dt %<>% melt(., id.vars = "response_level", variable.name = "variable", value.name = "coefficient")
+  
+   model_levels <- temp_fullModel$xlevels %>% 
+    lapply(., as.data.table) %>% 
+    rbindlist(., idcol = "variable")
+  
+   setnames(model_levels, "V1", "level")
+  
+   model_levels[, combined_name := paste0(variable, level)]
+  
+   coef_dt[model_levels, `:=` (variable_name = i.variable,
+                              variable_level = i.level), on = .(variable = combined_name)]
+   coef_dt[base_levels, reference_level := i.reference_level, on = .(variable_name = variable)]
+  
+   coef_dt %<>% .[!is.na(variable_name)]
+  
+   coef_dt[, odds_ratio := exp(coefficient)]
+
+   confint_dt <- confint(temp_fullModel) %>% as.data.table()
+
+  confint_dt %<>% dcast(., ... ~ V2, value.var = "value")  
+
+  setnames(confint_dt, c("variable", "response_level", "lower_log_odds_interval", "upper_log_odds_interval"))
+
+  confint_dt[, `:=` (lower_odds_ratio_interval = exp(lower_log_odds_interval),
+                   upper_odds_ratio_interval = exp(upper_log_odds_interval))]
+  coef_dt <- merge(coef_dt,
+                 confint_dt,
+                 by = c("variable", "response_level"),
+                        all.x = TRUE)
+
+  coef_dt[, variable := NULL]
 # Returns list of iteration results
   model_fit[[i]] <- list(full_model = temp_fullModel,
                          full_model_summary = summary(temp_fullModel),
