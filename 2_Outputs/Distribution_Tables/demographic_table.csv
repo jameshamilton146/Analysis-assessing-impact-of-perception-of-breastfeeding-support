@@ -1,0 +1,24 @@
+demographic_var_level,Count,demographic_var
+Hispanic,84,race_eth
+,43,race_eth
+"White, Non-Hispanic",1042,race_eth
+"Black, Non-Hispanic",53,race_eth
+Other,61,race_eth
+25-29,448,maternal_age
+35+,201,maternal_age
+30-34,346,maternal_age
+18-24,285,maternal_age
+,3,maternal_age
+College Graduate,519,education
+1-3 Years College,480,education
+High School,156,education
+Less Than High School,26,education
+,102,education
+">$50,000",601,income
+"$20,000-$49,999",527,income
+"<$20,000",155,income
+,35,bmi
+Normal Weight,567,bmi
+Obese,311,bmi
+Overweight,325,bmi
+Underweight,45,bmi

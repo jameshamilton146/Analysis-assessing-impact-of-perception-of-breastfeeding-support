@@ -1,0 +1,780 @@
+---
+title: "ASSESSING THE IMPACT OF MOTHER’S PERCEPTION OF SUPPORT ON BREASTFEEDING INTENSITY THROUGH SIX MONTHS: STATISTICAL ANALYSIS"
+author: "KATIE PALOMARES"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+  html_document:
+    toc: yes
+    toc_depth: '5'
+    df_print: paged
+---
+
+\newpage
+
+## Data Prep
+
+The code shown below implements the following process:
+
+1. Read in full IFPS dataset
+2. Subset the dataset to fields relevant to the study and apply necessary transformations
+3. Fit a multinomial logistic regression model to the data in order to ascertain the significance
+of perception of support on breast feeding intensity.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(haven)
+library(data.table)
+library(magrittr)
+library(stats)
+library(nnet)
+library(lmtest)
+library(MASS)
+library(ggplot2)
+library(googledrive)
+library(pedometrics)
+library(car)
+library(generalhoslem)
+```
+
+```{r data_prep, results = 'hide', echo = TRUE}
+
+
+data.directory <- "C:/Users/James/Documents/R/Katies_Thesis/0_Data/"
+
+ifps_dt <- "ifps2.sas7bdat" %>%
+           paste0(data.directory, .) %>%
+           read_sas() %>%
+           as.data.table()
+
+
+ifps_subset_dt <- ifps_dt[, .(SAMPMIQ)]
+
+# Breastfeeding difficulties, question 36 --------------------------
+
+N36_cols <- colnames(ifps_dt)[colnames(ifps_dt) %like% "N36"]
+
+N36_dt <- melt(ifps_dt[, .SD, .SDcols = c("SAMPMIQ", N36_cols)], 
+                id.vars = "SAMPMIQ", 
+                value.name = "response", 
+                variable.name = "question")
+
+N36_dt %<>% .[, .(response = sum(response, na.rm = TRUE)), keyby = .(SAMPMIQ)]
+
+N36_dt[, breast_feeding_difficulties := FALSE]
+N36_dt[response > 0, breast_feeding_difficulties := TRUE]
+
+ifps_subset_dt[N36_dt, 
+        breast_feeding_difficulties := i.breast_feeding_difficulties, 
+        on = .(SAMPMIQ)]
+
+rm(N36_dt, N36_cols)
+
+# ----------------------------------------------------------------------
+
+# Breast feeding support, question 38 -----------------------------------
+
+N38_dt <- ifps_dt[, .(N38, SAMPMIQ)]
+N38_dt[, breast_feeding_support := FALSE]
+N38_dt[N38 == 1, breast_feeding_support := TRUE]
+
+ifps_subset_dt[N38_dt, 
+            breast_feeding_support := i.breast_feeding_support, 
+            on = .(SAMPMIQ)]
+
+rm(N38_dt)
+
+# ------------------------------------------------------------------------
+
+# Perception of support, question 39
+
+N39_dt <- ifps_dt[, .(N39, SAMPMIQ)]
+
+N39_dt[N39 %in% c(1, 2), perception_of_support := "Unhelfpul"]
+N39_dt[N39 %in% c(3), perception_of_support := "Inconclusive"]
+N39_dt[N39 %in% c(4, 5), perception_of_support := "Helpful"]
+
+ifps_subset_dt[N39_dt, 
+            perception_of_support := i.perception_of_support, 
+            on = .(SAMPMIQ)]
+
+rm(N39_dt)
+
+# -----------------------------------------------------------------------
+
+# Breast Feeding Intensity at 2 - 6 months ----------------------------
+
+months <- 1:6
+
+for(i in months){
+
+  if (i == 1) {
+    feeding_cols <- colnames(ifps_dt)[colnames(ifps_dt) %like% "N40"]
+    
+    bf_feeding_col <- "N40A"
+  } else {
+    feeding_cols <- paste0("M", i, "A1", LETTERS[1:10])
+    
+    bf_feeding_col <- paste0("M", i, "A1A")
+  }
+
+  
+  temp_dt <- melt(ifps_dt[, .SD, .SDcols = c("SAMPMIQ", feeding_cols)],
+                  id.vars = "SAMPMIQ",
+                  value.name = "response",
+                  variable.name = "question")
+  
+  temp_dt[is.na(response) & question == bf_feeding_col, response := 0]
+  
+  temp_dt %<>% .[, .(breast_feeding_intensity = response[question == bf_feeding_col]/sum(response, 
+                                                                                     na.rm = TRUE)), 
+                keyby = .(SAMPMIQ)]
+  
+  temp_dt[is.nan(breast_feeding_intensity), breast_feeding_intensity := NA]
+  
+  ifps_subset_dt[temp_dt, breast_feeding_intensity := i.breast_feeding_intensity, on = .(SAMPMIQ)]
+  
+  setnames(ifps_subset_dt, "breast_feeding_intensity", paste0("breast_feeding_intensity_", i, "_mo"))
+  
+  rm(feeding_cols, bf_feeding_col, temp_dt)
+}
+
+# ----------------------------------------------------------------------
+
+# BFHI Exposure --------------------------------------------------------
+
+BFHI_dt <- ifps_dt[, .SD, .SDcols = c("N20", 
+                                      "N11", 
+                                      "N25", 
+                                      "N28", 
+                                      paste0("N29", c("A", "B", "C")),
+                                      "N32", 
+                                      "SAMPMIQ")]
+
+number_BFHI_criteria <- 6
+
+# Time until mother breastfed for the first time
+BFHI_dt[N20 %in% 1:2, BFHI_exp_1 := TRUE]
+BFHI_dt[N20 %in% 3:9, BFHI_exp_1 := FALSE]
+
+# No Pacifiers
+BFHI_dt[N11 %in% c(1, 3), BFHI_exp_2 := FALSE]
+BFHI_dt[N11 %in% c(2), BFHI_exp_2 := TRUE]
+
+# Rooming in
+BFHI_dt[N25 %in% c(1), BFHI_exp_3 := TRUE]
+BFHI_dt[N25 %in% c(2, 3), BFHI_exp_3 := FALSE]
+
+# BF on Demand
+BFHI_dt[N28 %in% c(1), BFHI_exp_4 := TRUE]
+BFHI_dt[N28 %in% c(2, 3), BFHI_exp_4 := FALSE]
+
+# Only BM
+BFHI_dt[N29A == 2 & N29B == 2 & N29C == 2, BFHI_exp_5 := TRUE]
+BFHI_dt[N29A %in% c(1, 3) | N29B %in% c(1, 3) | N29C %in% c(1, 3), BFHI_exp_5 := FALSE]
+
+# Fostering support groups
+BFHI_dt[N32 == 1, BFHI_exp_6 := TRUE]
+BFHI_dt[N32 == 2, BFHI_exp_6 := FALSE]
+
+BFHI_dt %<>% melt(., measure.vars = paste0("BFHI_exp_", 1:number_BFHI_criteria),
+                  variable.name = "question",
+                  value.name = "response")
+
+BFHI_dt %<>% .[, .(BFHI_score = sum(response, na.rm = TRUE),
+                   BFHI_all_missing = all(is.na(response))), by = .(SAMPMIQ)]
+
+BFHI_dt[BFHI_all_missing == TRUE, BFHI_score := NA]
+
+ifps_subset_dt[BFHI_dt, BFHI_score := i.BFHI_score, on = .(SAMPMIQ)]
+
+rm(BFHI_dt, number_BFHI_criteria)
+# ----------------------------------------------------------------------
+
+# Maternal Age ---------------------------------------------------------
+P9_dt <- ifps_dt[, .(P9, SAMPMIQ)]
+
+P9_dt[, unique(P9)] %>% sort()
+
+P9_dt[, maternal_age := cut(P9, 
+                            breaks = c(18, 25, 30, 35, Inf), 
+                            labels = c("18-24", "25-29", "30-34", "35+"),
+                            include.lowest = TRUE,
+                            right = FALSE)]
+
+ifps_subset_dt[P9_dt, maternal_age := i.maternal_age, on = .(SAMPMIQ)]
+
+rm(P9_dt)
+# ----------------------------------------------------------------------
+
+# Race/Ethnicity -------------------------------------------------------
+
+race_dt <- ifps_dt[, .(RACE_ETH, SAMPMIQ)]
+
+race_dt[RACE_ETH == 1, race_eth := "White, Non-Hispanic"]
+race_dt[RACE_ETH == 2, race_eth := "Black, Non-Hispanic"]
+race_dt[RACE_ETH == 3, race_eth := "Hispanic"]
+race_dt[RACE_ETH %in% c(4, 5), race_eth := "Other"]
+
+ifps_subset_dt[race_dt, race_eth := i.race_eth, on = .(SAMPMIQ)]
+
+rm(race_dt)
+# ----------------------------------------------------------------------
+
+# Education ---------------------------------------------
+edu_dt <- ifps_dt[, .(EDUC, SAMPMIQ)]
+
+edu_dt[EDUC %in% c(1, 2, 3), education := "Less Than High School"]
+edu_dt[EDUC %in% c(4), education := "High School"]
+edu_dt[EDUC %in% c(5), education := "1-3 Years College"]
+edu_dt[EDUC %in% c(6, 7), education := "College Graduate"]
+
+ifps_subset_dt[edu_dt, education := i.education, on = .(SAMPMIQ)]
+
+rm(edu_dt)
+# -------------------------------------------------------
+
+# Parity ------------------------------------------------
+parity_dt <- ifps_dt[, .(P41_1, P41_2, SAMPMIQ)]
+
+parity_dt[P41_1 == 0 & P41_2 == 0, parity := "nullipara"]
+parity_dt[P41_1 %in% 1:12 | P41_2 %in% 1:12, parity := "primipara"]
+
+ifps_subset_dt[parity_dt, parity := i.parity, on = .(SAMPMIQ)]
+
+parity_dt[, .N, by = .(keyby = P41_1)]
+parity_dt[, .N, by = .(keyby = P41_2)]
+rm(parity_dt)
+# -------------------------------------------------------
+
+# Income Level --------------------------------------------
+
+income_dt <- ifps_dt[, .(INCOME, SAMPMIQ)]
+
+income_dt[INCOME %in% 31:37, income := "<$20,000"]
+income_dt[INCOME %in% 38:46, income := "$20,000-$49,999"]
+income_dt[INCOME %in% 47:57, income := ">$50,000"]
+
+ifps_subset_dt[income_dt, income := i.income, on = .(SAMPMIQ)]
+
+rm(income_dt)
+# ---------------------------------------------------------
+
+# BMI -----------------------------------------------------
+bmi_dt <- ifps_dt[, .(P7, P8FT, P8IN, SAMPMIQ)]
+
+bmi_dt[, bmi := (P7/((P8FT * 12 + P8IN)^2)) * 703]
+
+bmi_dt[bmi < 18.5, bmi_class := "Underweight"]
+bmi_dt[bmi >= 18.5 & bmi <= 24.9, bmi_class := "Normal Weight"]
+bmi_dt[bmi >= 25 & bmi <= 29.9, bmi_class := "Overweight"]
+bmi_dt[bmi >= 30, bmi_class := "Obese"]
+
+ifps_subset_dt[bmi_dt, bmi := i.bmi_class, on = .(SAMPMIQ)]
+
+rm(bmi_dt)
+# ------------------------------------------------------------
+
+# WIC Participation -------------------------------------------
+
+wic_dt <- ifps_dt[, .(P6_1, P6_2, P6_3, SAMPMIQ)]
+
+wic_dt[P6_1 == 1 | P6_2 == 1, wic_participation := TRUE]
+wic_dt[P6_3 == 1, wic_participation := FALSE]
+
+ifps_subset_dt[wic_dt, wic_participation := i.wic_participation, on = .(SAMPMIQ)]
+
+
+rm(wic_dt)
+# ----------------------------------------------------------------------
+
+# Attitude toward breast feeding ----------------------------------
+
+attitude_dt <- ifps_dt[, .(P35E, SAMPMIQ)]
+
+attitude_dt[P35E == 1, breast_feeding_attitude := "Positive"]
+attitude_dt[P35E %in% c(2:5), breast_feeding_attitude := "Negative"]
+
+ifps_subset_dt[attitude_dt, breast_feeding_attitude := i.breast_feeding_attitude, on = .(SAMPMIQ)]
+
+
+rm(attitude_dt)
+
+# -----------------------------------------------------------------
+
+```
+
+
+```{r modeling, results = 'hide', echo = TRUE}
+modeling_dt <- melt(ifps_subset_dt, measure.vars = paste0("breast_feeding_intensity_", 1:6, "_mo"), 
+                      variable.name = "time_of_bf_intens_meas", 
+                      value.name = "numeric_bf_intensity")
+
+break_options <- c(0, .2, .8, 1)
+
+modeling_dt[, breast_feeding_intensity := cut(numeric_bf_intensity,
+                                                 breaks = break_options,
+                                                 labels = c("Low", "Medium", "High"),
+                                                 include.lowest = TRUE)]
+modeling_dt %<>% .[breast_feeding_difficulties == TRUE & 
+                     breast_feeding_support == TRUE & 
+                     !is.na(perception_of_support)] %>%
+                na.omit()
+
+modeling_dt[, numeric_bf_intensity := NULL]
+modeling_dt[, time_of_bf_intens_meas := gsub("breast_feeding_intensity_", "", time_of_bf_intens_meas)]
+modeling_dt[, time_of_bf_intens_meas := paste0(time_of_bf_intens_meas, "nth")]
+
+factor_cols <- modeling_dt[, .SD, .SDcols = -c("SAMPMIQ")] %>% colnames()
+
+modeling_dt[, (factor_cols) := lapply(.SD, as.factor), .SDcols = factor_cols]
+
+# Relevel Factors --------------------------------------------------------------
+
+modeling_dt[, `:=` (perception_of_support = relevel(perception_of_support, ref = "Inconclusive"),
+                    breast_feeding_intensity = relevel(breast_feeding_intensity, ref = "Low"),
+                    BFHI_score = relevel(BFHI_score, ref = "1"),
+                    maternal_age = relevel(maternal_age, ref = "25-29"),
+                    race_eth = relevel(race_eth, ref = "White, Non-Hispanic"),
+                    education = relevel(education, ref = "High School"),
+                    parity = relevel(parity, ref = "primipara"),
+                    income = relevel(income, ref = "$20,000-$49,999"),
+                    bmi = relevel(bmi, ref = "Normal Weight"),
+                    wic_participation = relevel(wic_participation, ref = "FALSE"),
+                    breast_feeding_attitude = relevel(breast_feeding_attitude, ref = "Negative"))]
+
+base_levels <- data.table(variable = c("perception_of_support",
+                                       "breast_feeding_intensity",
+                                       "BFHI_score",
+                                       "maternal_age",
+                                       "race_eth",
+                                       "education",
+                                       "parity",
+                                       "income",
+                                       "bmi",
+                                       "wic_participation",
+                                       "breast_feeding_attitude"),
+                          reference_level = c("Inconclusive",
+                                              "Low",
+                                              "1",
+                                              "25-29",
+                                              "White, Non-Hispanic",
+                                              "High School",
+                                              "primipara",
+                                              "$20,000 - $49,000",
+                                              "Normal Weight",
+                                              "False",
+                                              "Negative"))
+# ------------------------------------------------------------------------------
+
+modeling_data_list <- split(modeling_dt, by = "time_of_bf_intens_meas")
+
+response_var <- "perception_of_support"
+
+control_vars <- modeling_dt[, .SD, .SDcols = -c("SAMPMIQ", 
+                                                "breast_feeding_difficulties", 
+                                                "breast_feeding_support", 
+                                                response_var,
+                                                "breast_feeding_intensity",
+                                                "time_of_bf_intens_meas")] %>% colnames()
+
+control_formula <- as.formula(paste("breast_feeding_intensity ~ ", 
+                         paste(control_vars, collapse = "+")))
+
+# -----------------------------------------------------
+
+model_fit <- list()
+
+for(i in seq_along(modeling_data_list)){
+
+  temp_dt <- modeling_data_list[[i]]
+  
+  temp_controlModel <- multinom(control_formula, data = temp_dt)
+  
+  temp_stepwiseModel <- stepAIC(temp_controlModel)
+  temp_controlOrdModel <- polr(control_formula, data = temp_dt)
+  
+  temp_stepwiseOrdModel <- stepAIC(temp_controlOrdModel)
+  optimal_control_variable_subset <- temp_stepwiseModel$xlevels %>% names()
+  optimal_control_variable_subset_ord <- temp_stepwiseOrdModel$xlevels %>% names()
+full_formula <- as.formula(paste("breast_feeding_intensity ~ ", 
+                         paste(c(response_var, optimal_control_variable_subset), collapse = "+")))
+  
+full_Ordformula <- as.formula(paste("breast_feeding_intensity ~ ", 
+                         paste(c(response_var, optimal_control_variable_subset_ord), collapse = "+")))
+  temp_fullModel <- multinom(full_formula, 
+            data = temp_dt)
+  
+  temp_ordModel <- polr(full_Ordformula, data = temp_dt)
+  if(i == 1){
+  multi_col_model <- multinom(as.formula(paste("breast_feeding_intensity ~ ", 
+                         paste(c(response_var, control_vars), collapse = "+"))),
+                              data = temp_dt,
+                              model = TRUE)
+  
+  vif_dt <- vif(multi_col_model) %>% as.data.table()
+  vif_dt[, Variable := rownames(vif(multi_col_model))]
+  
+  } else {
+    vif_dt <- NULL
+  }
+  aic_table <- data.table(Model = c("Full_Model",
+                                    "Control_Model"),
+                          AIC = c(temp_fullModel$AIC, temp_controlModel$AIC),
+                          Relative_Likelihood = c(exp(-abs(temp_fullModel$AIC - temp_controlModel$AIC)/2),
+                                                  NA))
+
+   # Determining Coefficients
+  coef_dt <- coef(temp_fullModel) %>% as.data.table()
+
+coef_dt[, response_level := attributes(coef(temp_fullModel))$dimnames[[1]]]
+
+coef_dt %<>% melt(., id.vars = "response_level", variable.name = "variable", value.name = "coefficient")
+
+model_levels <- temp_fullModel$xlevels %>% 
+  lapply(., as.data.table) %>% 
+  rbindlist(., idcol = "variable")
+
+setnames(model_levels, "V1", "level")
+
+model_levels[, combined_name := paste0(variable, level)]
+
+coef_dt[model_levels, `:=` (variable_name = i.variable,
+                            variable_level = i.level), on = .(variable = combined_name)]
+coef_dt[base_levels, reference_level := i.reference_level, on = .(variable_name = variable)]
+
+coef_dt %<>% .[!is.na(variable_name)]
+
+coef_dt[, odds_ratio := exp(coefficient)]
+
+confint_dt <- confint(temp_fullModel) %>% as.data.table()
+
+confint_dt %<>% dcast(., ... ~ V2, value.var = "value")  
+
+setnames(confint_dt, c("variable", "response_level", "lower_log_odds_interval", "upper_log_odds_interval"))
+
+confint_dt[, `:=` (lower_odds_ratio_interval = exp(lower_log_odds_interval),
+                   upper_odds_ratio_interval = exp(upper_log_odds_interval))]
+coef_dt <- merge(coef_dt,
+                 confint_dt,
+                 by = c("variable", "response_level"),
+                        all.x = TRUE)
+
+coef_dt[, variable := NULL]
+  model_fit[[i]] <- list(full_model = temp_fullModel,
+       control_model = temp_stepwiseModel,
+       stepwise_results = temp_stepwiseModel$anova,
+       optimal_control_variables = optimal_control_variable_subset,
+       likelihood_ratio_test = lrtest(temp_fullModel,
+            temp_stepwiseModel),
+       AIC_table = aic_table,
+       coefficient_table = coef_dt,
+       multicol_metrics = vif_dt,
+       optimal_ord_variables = optimal_control_variable_subset_ord,
+       ord_likelihood_ratio_test = lrtest(temp_ordModel, temp_stepwiseOrdModel))
+}
+
+names(model_fit) <- names(modeling_data_list)
+# Plots -----------------------------------------------------------
+
+dist_plot <- ggplot(modeling_dt, aes(x = breast_feeding_intensity, fill = perception_of_support)) +
+  geom_bar(stat = "count", position = "dodge") +
+  facet_wrap(~ time_of_bf_intens_meas, ncol = 2)
+# ----------------------------------------------------------------------
+
+coef_list <- lapply(model_fit, function(x){
+  return(x[["coefficient_table"]])
+})
+
+names(coef_list) <- paste0(1:6, "_month_model_coefficient_table")
+
+multi_col_dt <- model_fit[["1_month"]][["multicol_metrics"]]
+# lapply(seq_along(coef_list), function(i){
+# 
+#   fwrite(coef_list[[i]], paste0(names(coef_list)[i], "_v2.csv"))
+# 
+#   drive_rm(paste0(names(coef_list)[i], ".csv"))
+#   drive_upload(paste0(names(coef_list)[i], "_v2.csv"))
+# 
+#   drive_share(paste0(names(coef_list)[i], "_v2.csv"),
+#               role = "reader",
+#               type = "user",
+#               emailAddress = "katie.palomares@gmail.com")
+# }) %>% invisible()
+
+test <- model_fit[["1_month"]][["full_model"]]
+
+test2 <- logitgof(modeling_data_list[[1]]$breast_feeding_intensity, fitted(test))
+```
+
+```{r data_exploration}
+data_exploration_dt <- copy(ifps_subset_dt)
+
+data_exploration_dt[breast_feeding_difficulties == TRUE & breast_feeding_support == TRUE & is.na(perception_of_support),
+                    perception_of_support := "Inconclusive"]
+
+test <- data_exploration_dt[breast_feeding_difficulties == TRUE & breast_feeding_support == TRUE & !is.na(perception_of_support),
+                            .N, keyby = .(BFHI_score)]
+break_options <- c(0, .2, .8, 1)
+
+data_exploration_dt[, (paste0("bf_int_cat_", 1:6, "_mo")) := lapply(.SD, function(x){
+  cut(x,
+      breaks = break_options,
+      labels = c("Low", "Medium", "High"),
+      include.lowest = TRUE) %>% return()
+}), .SDcols = paste0("breast_feeding_intensity_", 1:6, "_mo")]
+
+data_exploration_dt[breast_feeding_difficulties == TRUE & (breast_feeding_support == FALSE | is.na(breast_feeding_support)), perception_of_support := "No Support"]
+
+cat_control_dt <- lapply(control_vars, function(x){
+  temp_dt <- data_exploration_dt[breast_feeding_difficulties == TRUE, .N, keyby = c(x, "perception_of_support")]
+  setnames(temp_dt, x, "control_var_level")
+  temp_dt[, control_var := x]
+  
+  return(temp_dt)
+}) %>% rbindlist()
+
+observation_counts <- data_exploration_dt[breast_feeding_difficulties == TRUE, .N, by = .(perception_of_support)]
+
+percent_of_support_in_presence_of_diff <- data_exploration_dt[breast_feeding_difficulties == TRUE & 
+                                                                perception_of_support != "No Support", .N]/
+                                          data_exploration_dt[breast_feeding_difficulties == TRUE, .N]
+# fwrite(cat_control_dt, "categorizing_num_of_resp_into_each_cat.csv")
+# 
+# drive_rm("categorizing_num_of_resp_into_each_cat.csv")
+# drive_upload("categorizing_num_of_resp_into_each_cat.csv")
+# 
+# drive_share("categorizing_num_of_resp_into_each_cat.csv",
+#               role = "reader",
+#               type = "user",
+#               emailAddress = "katie.palomares@gmail.com")
+```
+
+ \newpage
+ 
+## Model Fit Summaries: Breast Feeding Intensity At Each Time Period
+
+Modeling results are shown below.  For each month (1:6), a full and control model are fit,
+according to the following structure.
+
+$$\text{Full Model: Breast Feeding Intensty at }i_{th}\text{ Month}\sim\text{Perception of Support + Control Variables}$$
+
+$$\text{Control Model: Breast Feeding Intensty at }i_{th}\text{ Month}\sim\text{Control Variables}$$
+
+Each model is a **Multinomial Logistic Regression**.  The control variables to be used
+are determined from a **bidirectional stepwise regression** using the Akaike Information Criterion.
+
+Once the full and control models are fit, a likelihood ratio test is peformed between the two.  
+The likelihood ratio test yields the following statistic:
+
+${\displaystyle \lambda _{\text{LR}}=-2\ln \left[{\frac {~\sup _{\theta \in \Theta _{0}}{\mathcal {L}}(\theta )~}{~\sup _{\theta \in \Theta }{\mathcal {L}}(\theta )~}}\right]}$
+
+According to Wilks' theorem, this statistic will asymptotically be chi-squared distributed 
+(${\displaystyle \chi ^{2}}$) with degrees of freedom equal to the difference in dimensionality 
+of ${\displaystyle \Theta }$  and ${\displaystyle \Theta _{0}}$
+
+Leveraging this result, we can draw conclusions about the significance of perception
+of support in predicting breast feeding intensity.
+
+
+### 1 Month
+
+The control variables determined are: `r model_fit[["1_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["1_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["1_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["1_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["1_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["1_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["1_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["1_month"]][["likelihood_ratio_test"]]
+
+model_fit[["1_month"]][["ord_likelihood_ratio_test"]]
+```
+
+### 2 Month
+
+The control variables determined are: `r model_fit[["2_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["2_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["2_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["2_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["2_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["2_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["2_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["2_month"]][["likelihood_ratio_test"]]
+```
+
+### 3 Month
+
+The control variables determined are: `r model_fit[["3_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["3_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["3_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["3_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["3_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["3_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["3_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["3_month"]][["likelihood_ratio_test"]]
+```
+
+### 4 Month
+
+The control variables determined are: `r model_fit[["4_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["4_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["4_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["4_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["4_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["4_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["4_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["4_month"]][["likelihood_ratio_test"]]
+```
+
+### 5 Month
+
+The control variables determined are: `r model_fit[["5_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["5_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["5_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["5_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["5_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["5_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["5_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["5_month"]][["likelihood_ratio_test"]]
+```
+
+### 6 Month
+
+The control variables determined are: `r model_fit[["6_month"]][["optimal_control_variables"]]`  
+
+The likelihood ratio test is performed between the model fit with only the control variables (Control Model) 
+and the model fit with both the control variables and perception of support (Full Model).  
+
+The test statistic derived from the likelihood ratios of each model is: `r model_fit[["6_month"]][["likelihood_ratio_test"]][["Chisq"]][2]`  
+
+This asymptotically approaches a chi-squared distribution with degrees of freedom: `r -model_fit[["6_month"]][["likelihood_ratio_test"]][["Df"]][2]`  
+
+The sample size for this test is: `r modeling_data_list[["6_month"]][, .N]`  
+
+This corresponds to a model p-value of: `r model_fit[["6_month"]][["likelihood_ratio_test"]][["Pr(>Chisq)"]][2]`  
+
+#### Full Model
+
+```{r}
+model_fit[["6_month"]][["full_model"]]
+```
+
+#### Control Model
+
+```{r}
+model_fit[["6_month"]][["control_model"]]
+```
+
+#### Likelihood Ratio Test
+
+```{r}
+model_fit[["6_month"]][["likelihood_ratio_test"]]
+```

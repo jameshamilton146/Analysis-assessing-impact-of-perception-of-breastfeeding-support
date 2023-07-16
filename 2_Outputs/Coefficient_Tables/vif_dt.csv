@@ -1,0 +1,11 @@
+GVIF,Df,GVIF^(1/(2*Df)),Variable
+12.2,2,1.87,perception_of_support
+1308.94,6,1.82,BFHI_score
+30.23,3,1.76,maternal_age
+8.64,3,1.43,race_eth
+35.8,3,1.82,education
+3.53,1,1.88,parity
+10.67,2,1.81,income
+10.21,3,1.47,bmi
+3.35,1,1.83,wic_participation
+1.39,1,1.18,breast_feeding_attitude

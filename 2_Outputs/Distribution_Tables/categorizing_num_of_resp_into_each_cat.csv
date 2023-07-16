@@ -1,0 +1,211 @@
+time_of_bf_intens_meas,variable_level,N,variable
+1_month,1,106,BFHI_score
+1_month,0,23,BFHI_score
+1_month,2,205,BFHI_score
+1_month,3,263,BFHI_score
+1_month,4,254,BFHI_score
+1_month,5,158,BFHI_score
+1_month,6,71,BFHI_score
+2_month,1,83,BFHI_score
+2_month,0,20,BFHI_score
+2_month,2,172,BFHI_score
+2_month,3,235,BFHI_score
+2_month,4,228,BFHI_score
+2_month,5,141,BFHI_score
+2_month,6,60,BFHI_score
+3_month,1,84,BFHI_score
+3_month,0,20,BFHI_score
+3_month,2,157,BFHI_score
+3_month,3,213,BFHI_score
+3_month,4,214,BFHI_score
+3_month,5,129,BFHI_score
+3_month,6,61,BFHI_score
+4_month,1,77,BFHI_score
+4_month,0,20,BFHI_score
+4_month,2,158,BFHI_score
+4_month,3,203,BFHI_score
+4_month,4,197,BFHI_score
+4_month,5,123,BFHI_score
+4_month,6,57,BFHI_score
+5_month,1,77,BFHI_score
+5_month,0,21,BFHI_score
+5_month,2,148,BFHI_score
+5_month,3,197,BFHI_score
+5_month,4,198,BFHI_score
+5_month,5,120,BFHI_score
+5_month,6,53,BFHI_score
+6_month,1,77,BFHI_score
+6_month,0,19,BFHI_score
+6_month,2,150,BFHI_score
+6_month,3,199,BFHI_score
+6_month,4,183,BFHI_score
+6_month,5,113,BFHI_score
+6_month,6,52,BFHI_score
+1_month,25-29,377,maternal_age
+1_month,18-24,219,maternal_age
+1_month,30-34,311,maternal_age
+1_month,35+,173,maternal_age
+2_month,25-29,329,maternal_age
+2_month,18-24,181,maternal_age
+2_month,30-34,274,maternal_age
+2_month,35+,155,maternal_age
+3_month,25-29,308,maternal_age
+3_month,18-24,158,maternal_age
+3_month,30-34,257,maternal_age
+3_month,35+,155,maternal_age
+4_month,25-29,279,maternal_age
+4_month,18-24,150,maternal_age
+4_month,30-34,258,maternal_age
+4_month,35+,148,maternal_age
+5_month,25-29,286,maternal_age
+5_month,18-24,135,maternal_age
+5_month,30-34,247,maternal_age
+5_month,35+,146,maternal_age
+6_month,25-29,282,maternal_age
+6_month,18-24,126,maternal_age
+6_month,30-34,246,maternal_age
+6_month,35+,139,maternal_age
+1_month,"White, Non-Hispanic",917,race_eth
+1_month,"Black, Non-Hispanic",43,race_eth
+1_month,Hispanic,69,race_eth
+1_month,Other,51,race_eth
+2_month,"White, Non-Hispanic",804,race_eth
+2_month,"Black, Non-Hispanic",37,race_eth
+2_month,Hispanic,59,race_eth
+2_month,Other,39,race_eth
+3_month,"White, Non-Hispanic",759,race_eth
+3_month,"Black, Non-Hispanic",32,race_eth
+3_month,Hispanic,48,race_eth
+3_month,Other,39,race_eth
+4_month,"White, Non-Hispanic",718,race_eth
+4_month,"Black, Non-Hispanic",30,race_eth
+4_month,Hispanic,48,race_eth
+4_month,Other,39,race_eth
+5_month,"White, Non-Hispanic",701,race_eth
+5_month,"Black, Non-Hispanic",31,race_eth
+5_month,Hispanic,42,race_eth
+5_month,Other,40,race_eth
+6_month,"White, Non-Hispanic",683,race_eth
+6_month,"Black, Non-Hispanic",26,race_eth
+6_month,Hispanic,43,race_eth
+6_month,Other,41,race_eth
+1_month,High School,139,education
+1_month,1-3 Years College,434,education
+1_month,College Graduate,484,education
+1_month,Less Than High School,23,education
+2_month,High School,117,education
+2_month,1-3 Years College,366,education
+2_month,College Graduate,441,education
+2_month,Less Than High School,15,education
+3_month,High School,106,education
+3_month,1-3 Years College,329,education
+3_month,College Graduate,431,education
+3_month,Less Than High School,12,education
+4_month,High School,97,education
+4_month,1-3 Years College,312,education
+4_month,College Graduate,412,education
+4_month,Less Than High School,14,education
+5_month,High School,98,education
+5_month,1-3 Years College,294,education
+5_month,College Graduate,410,education
+5_month,Less Than High School,12,education
+6_month,High School,95,education
+6_month,1-3 Years College,291,education
+6_month,College Graduate,395,education
+6_month,Less Than High School,12,education
+1_month,primipara,664,parity
+1_month,nullipara,416,parity
+2_month,primipara,576,parity
+2_month,nullipara,363,parity
+3_month,primipara,539,parity
+3_month,nullipara,339,parity
+4_month,primipara,512,parity
+4_month,nullipara,323,parity
+5_month,primipara,501,parity
+5_month,nullipara,313,parity
+6_month,primipara,493,parity
+6_month,nullipara,300,parity
+1_month,"$20,000-$49,999",442,income
+1_month,"<$20,000",124,income
+1_month,">$50,000",514,income
+2_month,"$20,000-$49,999",379,income
+2_month,"<$20,000",99,income
+2_month,">$50,000",461,income
+3_month,"$20,000-$49,999",352,income
+3_month,"<$20,000",91,income
+3_month,">$50,000",435,income
+4_month,"$20,000-$49,999",330,income
+4_month,"<$20,000",82,income
+4_month,">$50,000",423,income
+5_month,"$20,000-$49,999",325,income
+5_month,"<$20,000",78,income
+5_month,">$50,000",411,income
+6_month,"$20,000-$49,999",321,income
+6_month,"<$20,000",78,income
+6_month,">$50,000",394,income
+1_month,Normal Weight,498,bmi
+1_month,Obese,274,bmi
+1_month,Overweight,272,bmi
+1_month,Underweight,36,bmi
+2_month,Normal Weight,448,bmi
+2_month,Obese,229,bmi
+2_month,Overweight,233,bmi
+2_month,Underweight,29,bmi
+3_month,Normal Weight,415,bmi
+3_month,Obese,221,bmi
+3_month,Overweight,216,bmi
+3_month,Underweight,26,bmi
+4_month,Normal Weight,383,bmi
+4_month,Obese,208,bmi
+4_month,Overweight,217,bmi
+4_month,Underweight,27,bmi
+5_month,Normal Weight,376,bmi
+5_month,Obese,200,bmi
+5_month,Overweight,214,bmi
+5_month,Underweight,24,bmi
+6_month,Normal Weight,370,bmi
+6_month,Obese,195,bmi
+6_month,Overweight,208,bmi
+6_month,Underweight,20,bmi
+1_month,FALSE,791,wic_participation
+1_month,TRUE,289,wic_participation
+2_month,FALSE,704,wic_participation
+2_month,TRUE,235,wic_participation
+3_month,FALSE,674,wic_participation
+3_month,TRUE,204,wic_participation
+4_month,FALSE,635,wic_participation
+4_month,TRUE,200,wic_participation
+5_month,FALSE,631,wic_participation
+5_month,TRUE,183,wic_participation
+6_month,FALSE,609,wic_participation
+6_month,TRUE,184,wic_participation
+1_month,Negative,1015,breast_feeding_attitude
+1_month,Positive,65,breast_feeding_attitude
+2_month,Negative,884,breast_feeding_attitude
+2_month,Positive,55,breast_feeding_attitude
+3_month,Negative,827,breast_feeding_attitude
+3_month,Positive,51,breast_feeding_attitude
+4_month,Negative,782,breast_feeding_attitude
+4_month,Positive,53,breast_feeding_attitude
+5_month,Negative,768,breast_feeding_attitude
+5_month,Positive,46,breast_feeding_attitude
+6_month,Negative,750,breast_feeding_attitude
+6_month,Positive,43,breast_feeding_attitude
+1_month,Inconclusive,196,perception_of_support
+1_month,Helpful,664,perception_of_support
+1_month,Unhelpful,220,perception_of_support
+2_month,Inconclusive,177,perception_of_support
+2_month,Helpful,585,perception_of_support
+2_month,Unhelpful,177,perception_of_support
+3_month,Inconclusive,156,perception_of_support
+3_month,Helpful,553,perception_of_support
+3_month,Unhelpful,169,perception_of_support
+4_month,Inconclusive,149,perception_of_support
+4_month,Helpful,532,perception_of_support
+4_month,Unhelpful,154,perception_of_support
+5_month,Inconclusive,148,perception_of_support
+5_month,Helpful,523,perception_of_support
+5_month,Unhelpful,143,perception_of_support
+6_month,Inconclusive,146,perception_of_support
+6_month,Helpful,498,perception_of_support
+6_month,Unhelpful,149,perception_of_support
