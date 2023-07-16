@@ -512,12 +512,23 @@ for(i in seq_along(modeling_data_list)){
        stepwise_results = temp_stepwiseModel$anova,
        optimal_control_variables = optimal_control_variable_subset,
        likelihood_ratio_test = lrtest(temp_fullModel,
-            temp_stepwiseModel))
+            temp_stepwiseModel),
+       coef_dt = coef_dt)
 }
 
 names(model_fit) <- names(modeling_data_list)
 
 saveRDS(model_fit, file.path(project.directory, "2_Outputs/R_Objects/model_fit.RDS"))
+
+lapply(seq_along(model_fit), function(i){
+  fwrite(model_fit[[i]]$coef_dt, 
+         file.path(project.directory, 
+                   paste0("2_Outputs/Coefficient_Tables/",
+                          names(model_fit)[i],
+                          "_model_coefficient_table.csv"))
+  )
+  
+})
 
 fwrite(modeling_dt, file.path(data.directory, "modeling_dt.csv"))
 ```
