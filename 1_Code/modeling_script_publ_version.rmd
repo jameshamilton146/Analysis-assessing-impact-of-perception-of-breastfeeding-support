@@ -489,16 +489,16 @@ for(i in seq_along(modeling_data_list)){
   
    coef_dt %<>% .[!is.na(variable_name)]
   
-   coef_dt[, odds_ratio := exp(coefficient)]
+   coef_dt[, rel_risk := exp(coefficient)]
 
    confint_dt <- confint(temp_fullModel) %>% as.data.table()
 
   confint_dt %<>% dcast(., ... ~ V2, value.var = "value")  
 
-  setnames(confint_dt, c("variable", "response_level", "lower_log_odds_interval", "upper_log_odds_interval"))
+  setnames(confint_dt, c("variable", "response_level", "lower_log_rr_interval", "upper_log_rr_interval"))
 
-  confint_dt[, `:=` (lower_odds_ratio_interval = exp(lower_log_odds_interval),
-                   upper_odds_ratio_interval = exp(upper_log_odds_interval))]
+  confint_dt[, `:=` (lower_rel_risk_interval = exp(lower_log_rr_interval),
+                   upper_rel_risk_interval = exp(upper_log_rr_interval))]
   coef_dt <- merge(coef_dt,
                  confint_dt,
                  by = c("variable", "response_level"),
