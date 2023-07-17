@@ -1,4 +1,4 @@
-response_level,coefficient,variable_name,variable_level,reference_level,odds_ratio,lower_log_odds_interval,upper_log_odds_interval,lower_odds_ratio_interval,upper_odds_ratio_interval
+response_level,coefficient,variable_name,variable_level,reference_level,rel_risk,lower_log_rr_interval,upper_log_rr_interval,lower_rel_risk_interval,upper_rel_risk_interval
 High,-0.681490364714874,BFHI_score,1,0,0.505862510642336,-1.91535735577183,0.552376626342085,0.147289188538742,1.73737721153958
 Medium,-0.518013290642356,BFHI_score,1,0,0.595702861574025,-2.08841348445531,1.05238690317059,0.123883523125674,2.86448020151551
 High,-0.161876192744683,BFHI_score,2,0,0.850546501849727,-1.3325344741855,1.00878208869613,0.263807799233931,2.74225915196429
